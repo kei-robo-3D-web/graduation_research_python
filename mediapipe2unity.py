@@ -44,6 +44,14 @@ def mediape_thread(loop):
             for hand_landmarks in results.multi_hand_landmarks:
                 for lm in hand_landmarks.landmark:
                     hand_data.append({"x": lm.x, "y": lm.y, "z": lm.z})
+            
+            mp.solutions.drawing_utils.draw_landmarks(
+                image=frame,
+                landmark_list=hand_landmarks,
+                connections=mp_pose.HAND_CONNECTIONS,
+                landmark_drawing_spec=mp.solutions.drawing_styles.get_default_hand_landmarks_style(),
+                connection_drawing_spec=mp.solutions.drawing_styles.get_default_hand_connections_style()
+            )
 
             if current_websocket is not None:
                 try:
