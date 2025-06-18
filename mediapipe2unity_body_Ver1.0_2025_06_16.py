@@ -5,12 +5,9 @@ import asyncio
 import threading
 import json
 
-#6月16日　カメラからの距離推定を実装
-
-
 current_websocket = None
-event_loop = None  # イベントループ保持用
-shutdown_event = None  # シャットダウン用イベント
+event_loop = None
+shutdown_event = None
 
 async def echo(websocket):
     global current_websocket
@@ -22,17 +19,16 @@ async def echo(websocket):
     except websockets.exceptions.ConnectionClosed:
         print("WebSocket connection closed.")
 
-
 def mediape_thread(loop):
     global current_websocket, shutdown_event
 
-    mp_pose = mp.solutions.hands
-    pose = mp_pose.Hands()
+    mp_pose = mp.solutions.pose
+    pose = mp_pose.Pose()
     cap = cv2.VideoCapture(0)
 
     if not cap.isOpened():
         print("Error: Camera not found.")
-        exit()
+        return
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -43,33 +39,36 @@ def mediape_thread(loop):
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = pose.process(rgb_frame)
 
-        hand_data = []
-        if results.multi_hand_landmarks:
-            for hand_landmarks in results.multi_hand_landmarks:
-                for lm in hand_landmarks.landmark:
-                    hand_data.append({"x": lm.x, "y": lm.y, "z": lm.z})
-            
+        pose_data = []
+        if results.pose_landmarks:
+            # 全てのlandmarkを収集
+            for lm in results.pose_landmarks.landmark:
+                pose_data.append({"x": lm.x, "y": lm.y, "z": lm.z})
+
+            # 骨格の描画（関節＋線）
             mp.solutions.drawing_utils.draw_landmarks(
                 image=frame,
-                landmark_list=hand_landmarks,
-                connections=mp_pose.HAND_CONNECTIONS,
-                landmark_drawing_spec=mp.solutions.drawing_styles.get_default_hand_landmarks_style(),
-                connection_drawing_spec=mp.solutions.drawing_styles.get_default_hand_connections_style()
+                landmark_list=results.pose_landmarks,
+                connections=mp_pose.POSE_CONNECTIONS,
+                landmark_drawing_spec=mp.solutions.drawing_styles.get_default_pose_landmarks_style(),
+                # get_default_pose_connections_style() は存在しないので削除
+                connection_drawing_spec=mp.solutions.drawing_utils.DrawingSpec(color=(0,255,0), thickness=2)
             )
 
+            # WebSocket送信（Unity側受信を想定）
             if current_websocket is not None:
                 try:
                     asyncio.run_coroutine_threadsafe(
-                        current_websocket.send(json.dumps({"hands": hand_data})),
+                        current_websocket.send(json.dumps({"pose": pose_data})),
                         loop
                     )
                 except Exception as e:
                     print("Send failed:", e)
 
+        # ウィンドウ表示
         cv2.imshow("Pose Estimation", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             print("Q pressed: shutting down.")
-            # イベントをセットしてWebSocketも止める
             loop.call_soon_threadsafe(shutdown_event.set)
             break
 
@@ -81,15 +80,17 @@ async def main():
     event_loop = asyncio.get_running_loop()
     shutdown_event = asyncio.Event()
 
-    # メディアパイプ処理を別スレッドで起動
+    # MediaPipeをスレッドで起動
     thread1 = threading.Thread(target=mediape_thread, args=(event_loop,))
     thread1.start()
 
     async with websockets.serve(echo, "localhost", 8765):
         print("WebSocket server started on ws://localhost:8765")
-        # shutdown_event が set() されるまで待つ
         await shutdown_event.wait()
         print("WebSocket server shutting down.")
 
-# 実行
-asyncio.run(main())
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Keyboard interrupt received.")
