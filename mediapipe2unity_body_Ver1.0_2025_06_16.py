@@ -22,6 +22,7 @@ async def echo(websocket):
 def mediape_thread(loop):
     global current_websocket, shutdown_event
 
+
     mp_pose = mp.solutions.pose
     pose = mp_pose.Pose()
     cap = cv2.VideoCapture(0)
@@ -41,9 +42,11 @@ def mediape_thread(loop):
 
         pose_data = []
         if results.pose_landmarks:
+            usingLandmarks = [11,12,13,14,15,16,23,24,25,26,27,28,31,32]
             # 全てのlandmarkを収集
-            for lm in results.pose_landmarks.landmark:
-                pose_data.append({"x": lm.x, "y": lm.y, "z": lm.z})
+            for i in usingLandmarks:
+                    lm = results.pose_landmarks.landmark[i]
+                    pose_data.append({"x": lm.x, "y": lm.y, "z": lm.z})
 
             # 骨格の描画（関節＋線）
             mp.solutions.drawing_utils.draw_landmarks(
@@ -59,7 +62,7 @@ def mediape_thread(loop):
             if current_websocket is not None:
                 try:
                     asyncio.run_coroutine_threadsafe(
-                        current_websocket.send(json.dumps({"pose": pose_data})),
+                        current_websocket.send(json.dumps({"bodys": pose_data})),
                         loop
                     )
                 except Exception as e:
