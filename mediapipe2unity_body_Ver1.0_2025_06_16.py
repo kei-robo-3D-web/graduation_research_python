@@ -42,8 +42,7 @@ def mediape_thread(loop):
 
         pose_data = []
         if results.pose_landmarks:
-            usingLandmarks = [11,12,13,14,15,16,23,24,25,26,27,28,31,32]
-            # 全てのlandmarkを収集
+            usingLandmarks = [11,12,13,14,15,16,25,26,27,28]
             for i in usingLandmarks:
                     lm = results.pose_landmarks.landmark[i]
                     pose_data.append({"x": lm.x, "y": lm.y, "z": lm.z})
