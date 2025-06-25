@@ -53,7 +53,6 @@ def mediape_thread(loop):
                 landmark_list=results.pose_landmarks,
                 connections=mp_pose.POSE_CONNECTIONS,
                 landmark_drawing_spec=mp.solutions.drawing_styles.get_default_pose_landmarks_style(),
-                # get_default_pose_connections_style() は存在しないので削除
                 connection_drawing_spec=mp.solutions.drawing_utils.DrawingSpec(color=(0,255,0), thickness=2)
             )
 
